@@ -26,11 +26,14 @@ def limpar_e_mapear(valor):
 
 @app.route('/process', methods=['POST'])
 def process():
+    # Recebe uma lista de valores "sujos" em um array JSON
     dados = request.json.get("dados", [])
-    df = pd.DataFrame(dados, columns=["Valor sujo"])
-    df["Faixa padronizada"] = df["Valor sujo"].apply(limpar_e_mapear)
-    resultado = df.to_dict(orient="records")
-    return jsonify(resultado)
+    
+    # Processa cada valor na lista e mapeia para a faixa padronizada correspondente
+    resultados = [{"Valor sujo": item["Valor sujo"], "Faixa padronizada": limpar_e_mapear(item["Valor sujo"])} for item in dados]
+    
+    # Retorna os resultados como uma lista JSON
+    return jsonify(resultados)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
