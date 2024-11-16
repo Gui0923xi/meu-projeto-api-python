@@ -54,10 +54,12 @@ def atualizar_regex():
         # Gera os regex dinamicamente
         regex_gerados = gerar_regex(dados)
 
-        return jsonify({"mensagem": "Regex atualizado com sucesso", "regex": regex_gerados}), 200
+        # Retorna apenas os regex prontos
+        return jsonify(regex_gerados), 200
 
     except Exception as e:
         return jsonify({"erro": f"Erro ao atualizar regex: {str(e)}"}), 500
+
 
 # Endpoint para processar os dados
 @app.route('/process', methods=['POST'])
