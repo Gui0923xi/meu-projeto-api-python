@@ -40,7 +40,7 @@ def atualizar_regex():
     try:
         dados = request.json.get("dados", [])
         if isinstance(dados, str):
-            dados = [item.strip() for item in dados.split(",")]
+            dados = [item.strip().lower() for item in dados.split(",")]  # Padroniza os dados
 
         if not dados or not isinstance(dados, list):
             return jsonify({"erro": "Nenhum dado válido fornecido"}), 400
@@ -67,7 +67,7 @@ def processar_dados():
 
         # Verifica se os dados foram enviados como string (separados por vírgulas)
         if isinstance(dados, str):
-            dados = [item.strip() for item in dados.split(",")]  # Converte string para lista
+            dados = [item.strip().lower() for item in dados.split(",")]  # Padroniza os dados
 
         if not dados or not isinstance(dados, list):
             return jsonify({"erro": "Nenhum dado válido fornecido"}), 400
