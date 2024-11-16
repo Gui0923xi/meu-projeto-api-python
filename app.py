@@ -31,12 +31,6 @@ def gerar_regex_automatico(valores):
                 regex = rf"(acima_de|maior_que|maior).*{limite.group(0)}"
                 faixas[regex] = f"Acima de R${limite.group(0)}"
 
-        else:
-            numeros = re.findall(r'\d+', valor_limpo)
-            if len(numeros) == 1:
-                regex = rf".*{numeros[0]}.*"
-                faixas[regex] = f"Contém o valor R${numeros[0]}"
-
     return faixas
 
 
