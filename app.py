@@ -4,75 +4,27 @@ import json
 
 app = Flask(__name__)
 
-# Armazena os regex gerados dinamicamente
-regex_map = {}
-
-# Função para gerar regex dinamicamente com base nos dados
-def gerar_regex(dados):
-    global regex_map
-    regex_map = {}
-
-    for item in dados:
-        # Detecta faixas numéricas: Exemplo "Entre R$2.801 e R$3.200"
-        if re.search(r"r\$[0-9]+[.,]?[0-9]*_a_r\$[0-9]+[.,]?[0-9]*", item):
-            match = re.findall(r"r\$[0-9]+[.,]?[0-9]*_a_r\$[0-9]+[.,]?[0-9]*", item)
-            for m in match:
-                valor1, valor2 = m.replace("r$", "").replace("_a_", " ").split(" ")
-                regex_map[rf"{re.escape(m)}"] = f"Entre R${valor1} e R${valor2}"
-
-        # Detecta números soltos com "Até R$X"
-        elif re.search(r"até_r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE):
-            match = re.findall(r"até_r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE)
-            for m in match:
-                valor = m.replace("até_r$", "")
-                regex_map[rf"{re.escape(m)}"] = f"Abaixo de R${valor}"
-
-        # Detecta números soltos com "R$X"
-        elif re.search(r"r\$[0-9]+[.,]?[0-9]*", item):
-            match = re.findall(r"r\$[0-9]+[.,]?[0-9]*", item)
-            for m in match:
-                valor = m.replace("r$", "")
-                regex_map[rf"{re.escape(m)}"] = f"Abaixo de R${valor}"
-
-        # Detecta números soltos com "Maior que R$X"
-        elif re.search(r"maior_que_r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE):
-            match = re.findall(r"maior_que_r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE)
-            for m in match:
-                valor = m.replace("maior_que_r$", "")
-                regex_map[rf"{re.escape(m)}"] = f"Maior que R${valor}"
-
-    return regex_map
-
-# Endpoint para atualizar os regex
-@app.route('/update-regex', methods=['POST'])
-def atualizar_regex():
+# Função para converter regex de texto separado por vírgula para dicionário
+def parse_regex_text_to_dict(regex_text):
     try:
-        # Recebe os regex enviados pelo cliente como texto separado por vírgulas
-        raw_regex = request.json.get("regex", "")
-        if not raw_regex:
-            return jsonify({"erro": "Nenhum regex fornecido"}), 400
-
-        # Divide o texto em partes separadas por vírgula e converte para dicionário
-        regex_str = raw_regex.replace("}{", "},{")  # Ajusta casos sem separação clara
-        regex_list = regex_str.split(",")  # Divide pelos delimitadores de vírgula
-        regex_dict = json.loads("{" + ",".join(regex_list) + "}")
-
-        global regex_map
-        regex_map = regex_dict  # Atualiza o regex_map com o dicionário enviado
-
-        return jsonify({"mensagem": "Regex atualizado com sucesso", "regex": regex_map}), 200
-
+        regex_pairs = regex_text.split(",")
+        regex_dict = {}
+        for pair in regex_pairs:
+            key, value = pair.split(":")
+            regex_dict[key.strip().strip('"')] = value.strip().strip('"')
+        return regex_dict
     except Exception as e:
-        return jsonify({"erro": f"Erro ao atualizar regex: {str(e)}"}), 500
+        raise ValueError(f"Erro ao converter regex: {str(e)}")
 
 # Endpoint para processar os dados
 @app.route('/process', methods=['POST'])
 def processar_dados():
     try:
-        # Recebe os dados enviados pelo cliente como texto separado por vírgulas
+        # Recebe os dados enviados pelo cliente
         dados_raw = request.json.get("dados", [])
-        if not dados_raw:
-            return jsonify({"erro": "Nenhum dado fornecido"}), 400
+        regex_raw = request.json.get("regex", "")
+        if not dados_raw or not regex_raw:
+            return jsonify({"erro": "Dados ou regex não fornecidos"}), 400
 
         # Divide os dados em itens separados por vírgula
         dados = []
@@ -83,9 +35,11 @@ def processar_dados():
             else:
                 dados.append(linha)
 
-        # Verifica se o regex_map está vazio
-        if not regex_map:
-            return jsonify({"erro": "Nenhum regex configurado. Atualize o regex primeiro."}), 400
+        # Converte regex de texto para dicionário
+        try:
+            regex_map = parse_regex_text_to_dict(regex_raw)
+        except ValueError as e:
+            return jsonify({"erro": str(e)}), 400
 
         resultados = []
         for item in dados:
