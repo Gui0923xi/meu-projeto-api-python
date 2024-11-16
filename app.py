@@ -55,16 +55,26 @@ def atualizar_regex():
         if not dados_raw:
             return jsonify({"erro": "Nenhum dado fornecido"}), 400
 
+        # Log dos dados recebidos
+        print(f"Dados recebidos: {dados_raw}")
+
         # Divide o texto em uma lista
         dados = split_text(dados_raw)
 
+        # Log dos dados após a divisão
+        print(f"Dados divididos: {dados}")
+
         # Gera os regex dinamicamente
         regex_gerados = gerar_regex(dados)
+
+        # Log dos regex gerados
+        print(f"Regex gerados: {regex_gerados}")
 
         # Retorna os regex no formato JSON diretamente utilizável no /process
         return jsonify(regex_gerados), 200
 
     except Exception as e:
+        print(f"Erro no /update-regex: {str(e)}")
         return jsonify({"erro": f"Erro ao atualizar regex: {str(e)}"}), 500
 
 # Endpoint para processar os dados utilizando regex fornecido
