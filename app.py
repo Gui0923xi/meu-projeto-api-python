@@ -80,7 +80,9 @@ def processar_dados_final():
         # Divide os dados em itens separados por vírgula
         dados = split_text(dados_raw)
 
-        resultados = []
+        resultados_sucesso = []
+        resultados_nao_encontrados = []
+
         for item in dados:
             matches = []  # Lista para armazenar todas as correspondências para o item
             for padrao, descricao in regex_map.items():
@@ -89,13 +91,19 @@ def processar_dados_final():
 
             # Escolher a correspondência mais específica (priorizando faixas)
             if not matches:
-                resultados.append("Faixa não identificada")
+                resultados_nao_encontrados.append(item)
             else:
                 # Ordenar correspondências por comprimento (mais específica = mais detalhada)
                 matches.sort(key=len, reverse=True)
-                resultados.append(matches[0])  # Escolher a correspondência mais longa/específica
+                resultados_sucesso.append({
+                    "dado": item,
+                    "faixa": matches[0]  # Escolher a correspondência mais longa/específica
+                })
 
-        return jsonify({"resultados": resultados}), 200
+        return jsonify({
+            "sucesso": resultados_sucesso,
+            "nao_identificados": resultados_nao_encontrados
+        }), 200
 
     except Exception as e:
         return jsonify({"erro": f"Erro ao processar os dados: {str(e)}"}), 500
