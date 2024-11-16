@@ -32,12 +32,10 @@ def processar_dados_em_massa():
     valores = entrada[0].split(',')
     
     # Processa cada valor da lista
-    resultado = [{"Valor sujo": valor.strip(), 
-                  "Faixa padronizada": limpar_e_mapear(valor.strip())} 
-                 for valor in valores]
+    faixas_padronizadas = [limpar_e_mapear(valor.strip()) for valor in valores]
 
-    # Retorna o resultado consolidado
-    return jsonify({"resultados": resultado})
+    # Retorna os valores padronizados como uma string separada por vírgulas
+    return jsonify(", ".join(faixas_padronizadas))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
