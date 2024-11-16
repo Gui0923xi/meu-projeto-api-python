@@ -9,7 +9,6 @@ def gerar_regex_automatico(valores):
     """
     faixas = {}
     for valor in valores:
-        # Limpando o valor para facilitar a análise
         valor_limpo = re.sub(r'[^\w\s,.R$]', '', valor.lower().strip())
         valor_limpo = re.sub(r'[.,]', '', valor_limpo)
         
@@ -33,7 +32,6 @@ def gerar_regex_automatico(valores):
                 faixas[regex] = f"Acima de R${limite.group(0)}"
 
         else:
-            # Caso nenhum padrão específico seja encontrado, capturar genéricos
             numeros = re.findall(r'\d+', valor_limpo)
             if len(numeros) == 1:
                 regex = rf".*{numeros[0]}.*"
