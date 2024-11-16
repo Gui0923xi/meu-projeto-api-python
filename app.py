@@ -65,9 +65,18 @@ def atualizar_regex():
 def processar_dados():
     try:
         # Recebe os dados enviados pelo cliente
-        dados = request.json.get("dados", [])
-        if not dados:
+        dados_raw = request.json.get("dados", [])
+        if not dados_raw:
             return jsonify({"erro": "Nenhum dado fornecido"}), 400
+
+        # Dividir os dados em itens separados por vírgula
+        dados = []
+        for linha in dados_raw:
+            if isinstance(linha, str):
+                # Divide a linha por vírgula e remove espaços em branco
+                dados.extend([item.strip() for item in linha.split(",")])
+            else:
+                dados.append(linha)
 
         # Verifica se o regex_map está vazio
         if not regex_map:
