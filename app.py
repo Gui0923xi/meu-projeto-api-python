@@ -1,65 +1,73 @@
-import openai
 from flask import Flask, request, jsonify
 import re
+import json
+import os
 
 app = Flask(__name__)
 
-import openai
+# Carrega os regex salvos em um arquivo JSON
+def carregar_regex():
+    if os.path.exists("regex_config.json"):
+        with open("regex_config.json", "r") as file:
+            return json.load(file)
+    return {}
 
-openai.api_key = "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"
+# Salva os regex em um arquivo JSON
+def salvar_regex(novos_regex):
+    with open("regex_config.json", "w") as file:
+        json.dump(novos_regex, file)
 
-def gerar_regex(dados):
-    try:
-        prompt = f"Crie regex para os seguintes dados: {dados}"
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "Você é um assistente especializado em gerar expressões regulares (regex)."},
-                {"role": "user", "content": prompt}
-            ]
-        )
-        return response['choices'][0]['message']['content']
-    except Exception as e:
-        return f"Erro ao gerar regex: {str(e)}"
+# Função para processar dados usando regex
+def processar_dados(dados, regex_config):
+    resultados = []
+    for valor in dados:
+        padronizado = "Faixa não identificada"
+        for padrao, descricao in regex_config.items():
+            if re.search(padrao, valor, re.IGNORECASE):
+                padronizado = descricao
+                break
+        resultados.append(padronizado)
+    return resultados
 
-
-def limpar_e_mapear(valor, faixas):
-    """
-    Limpa o valor e aplica o regex gerado dinamicamente.
-    """
-    valor = re.sub(r'[^\w\s,.R$]', '', valor.lower().strip())
-    valor = re.sub(r'[.,]', '', valor)  # Remove pontuações problemáticas
-    for padrao, faixa in faixas.items():
-        if re.search(padrao, valor):
-            return faixa
-    return "Faixa não identificada"
-
+# Endpoint para processar dados
 @app.route('/process', methods=['POST'])
-def processar_dados_com_chatgpt():
-    """
-    Endpoint que processa os dados utilizando regex gerados pelo ChatGPT.
-    """
-    entrada = request.json.get("dados", [])
-    if not isinstance(entrada, list) or len(entrada) == 0 or not isinstance(entrada[0], str):
-        return jsonify({"error": "Esperado um array contendo uma única string no campo 'dados'"}), 400
-    
-    # Separar os valores enviados em uma lista
-    valores = entrada[0].split(',')
+def process():
+    try:
+        entrada = request.json.get("dados", [])
+        if not entrada:
+            return jsonify({"erro": "Nenhum dado fornecido"}), 400
 
-    # Obter regex gerados pelo ChatGPT
-    faixas = obter_regex_chatgpt(valores)
-    if "error" in faixas:
-        return jsonify(faixas), 500  # Retorna erro caso falhe a geração do regex
+        # Carrega os regex configurados
+        regex_config = carregar_regex()
 
-    # Processar os valores
-    faixas_padronizadas = []
-    for valor in valores:
-        faixa = limpar_e_mapear(valor, faixas)
-        faixas_padronizadas.append(faixa)
-    
-    # Retornar apenas os dados padronizados, separados por vírgula
-    return jsonify(", ".join(faixas_padronizadas))
+        # Divide a string de entrada em uma lista separada por vírgula
+        dados_lista = [item.strip() for item in entrada[0].split(",")]
 
+        # Processa os dados em massa
+        resultados = processar_dados(dados_lista, regex_config)
+
+        # Junta os resultados padronizados em uma única string separada por vírgula
+        resposta = ", ".join(resultados)
+        return jsonify({"resultado": resposta}), 200
+
+    except Exception as e:
+        return jsonify({"erro": f"Erro ao processar os dados: {str(e)}"}), 500
+
+# Endpoint para atualizar regex
+@app.route('/update-regex', methods=['POST'])
+def update_regex():
+    try:
+        novos_regex = request.json.get("regex", {})
+        if not novos_regex:
+            return jsonify({"erro": "Nenhum regex fornecido"}), 400
+
+        # Salva os regex no arquivo
+        salvar_regex(novos_regex)
+        return jsonify({"mensagem": "Regex atualizado com sucesso"}), 200
+
+    except Exception as e:
+        return jsonify({"erro": f"Erro ao atualizar regex: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
