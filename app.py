@@ -47,6 +47,27 @@ def split_text(text):
     return [item.strip() for item in text.split(",") if item.strip()]
 
 # Endpoint para gerar regex a partir dos dados fornecidos
+@app.route('/update-regex', methods=['POST'])
+def atualizar_regex():
+    try:
+        # Recebe os dados enviados pelo cliente como texto separado por vírgulas
+        dados_raw = request.json.get("dados", "")
+        if not dados_raw:
+            return jsonify({"erro": "Nenhum dado fornecido"}), 400
+
+        # Divide o texto em uma lista
+        dados = split_text(dados_raw)
+
+        # Gera os regex dinamicamente
+        regex_gerados = gerar_regex(dados)
+
+        # Retorna os regex no formato JSON diretamente utilizável no /process
+        return jsonify(regex_gerados), 200
+
+    except Exception as e:
+        return jsonify({"erro": f"Erro ao atualizar regex: {str(e)}"}), 500
+
+# Endpoint para processar os dados utilizando regex fornecido
 @app.route('/process', methods=['POST'])
 def processar_dados():
     try:
@@ -79,7 +100,6 @@ def processar_dados():
 
     except Exception as e:
         return jsonify({"erro": f"Erro ao processar os dados: {str(e)}"}), 500
-
 
 if __name__ == '__main__':
     app.run(debug=True)
