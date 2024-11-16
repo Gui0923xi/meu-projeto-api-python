@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify
 import re
-import json
 
 app = Flask(__name__)
 
@@ -43,26 +42,21 @@ def gerar_regex(dados):
 
     return regex_map
 
-# Função para converter regex de texto separado por vírgula para dicionário
-def parse_regex_text_to_dict(regex_text):
-    try:
-        regex_pairs = regex_text.split(",")
-        regex_dict = {}
-        for pair in regex_pairs:
-            key, value = pair.split(":")
-            regex_dict[key.strip().strip('"')] = value.strip().strip('"')
-        return regex_dict
-    except Exception as e:
-        raise ValueError(f"Erro ao converter regex: {str(e)}")
+# Função para dividir texto separado por vírgula em lista
+def split_text(text):
+    return [item.strip() for item in text.split(",") if item.strip()]
 
 # Endpoint para gerar regex a partir dos dados fornecidos
 @app.route('/update-regex', methods=['POST'])
 def atualizar_regex():
     try:
-        # Recebe os dados enviados pelo cliente
-        dados = request.json.get("dados", [])
-        if not dados:
+        # Recebe os dados enviados pelo cliente como texto separado por vírgulas
+        dados_raw = request.json.get("dados", "")
+        if not dados_raw:
             return jsonify({"erro": "Nenhum dado fornecido"}), 400
+
+        # Divide o texto em uma lista
+        dados = split_text(dados_raw)
 
         # Gera os regex dinamicamente
         regex_gerados = gerar_regex(dados)
@@ -77,26 +71,22 @@ def atualizar_regex():
 @app.route('/process', methods=['POST'])
 def processar_dados():
     try:
-        # Recebe os dados enviados pelo cliente como texto separado por vírgulas
-        dados_raw = request.json.get("dados", [])
+        # Recebe os dados e regex enviados pelo cliente como texto separado por vírgulas
+        dados_raw = request.json.get("dados", "")
         regex_raw = request.json.get("regex", "")
         if not dados_raw or not regex_raw:
             return jsonify({"erro": "Dados ou regex não fornecidos"}), 400
 
-        # Divide os dados em itens separados por vírgula
-        dados = []
-        for linha in dados_raw:
-            if isinstance(linha, str):
-                # Divide a linha por vírgula e remove espaços em branco
-                dados.extend([item.strip() for item in linha.split(",")])
-            else:
-                dados.append(linha)
+        # Divide os dados e regex em listas
+        dados = split_text(dados_raw)
+        regex_list = split_text(regex_raw)
 
-        # Converte regex de texto para dicionário
-        try:
-            regex_map = parse_regex_text_to_dict(regex_raw)
-        except ValueError as e:
-            return jsonify({"erro": str(e)}), 400
+        # Converte a lista de regex para um dicionário
+        regex_map = {}
+        for pair in regex_list:
+            if ":" in pair:
+                key, value = pair.split(":", 1)
+                regex_map[key.strip().strip('"')] = value.strip().strip('"')
 
         resultados = []
         for item in dados:
