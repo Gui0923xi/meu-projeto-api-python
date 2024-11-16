@@ -67,10 +67,11 @@ def atualizar_regex():
 def processar_dados():
     """
     Processa os dados recebidos aplicando os regex enviados na requisição.
-    Identifica e gera novos regex para dados não identificados até que todos sejam processados.
     """
     try:
         payload = request.json
+        print("Payload recebido:", payload)
+
         dados = payload.get("dados", [])
         regex_map = payload.get("regex", {})
 
@@ -86,28 +87,20 @@ def processar_dados():
         resultados = []
         nao_identificados = []
 
-        # Processar os dados até que todos sejam identificados
-        while True:
-            resultados = []
-            nao_identificados = []
-
-            for item in dados:
-                resultado = []
-                for padrao, descricao in regex_map.items():
+        for item in dados:
+            print("Item sendo processado:", item)
+            resultado = []
+            for padrao, descricao in regex_map.items():
+                try:
                     if re.search(padrao, item):
                         resultado.append(descricao)
-                if not resultado:
-                    nao_identificados.append(item)
-                resultados.append(", ".join(resultado) if resultado else "Faixa não identificada")
+                except re.error as regex_error:
+                    print(f"Erro ao aplicar regex '{padrao}': {regex_error}")
+            if not resultado:
+                nao_identificados.append(item)
+            resultados.append(", ".join(resultado) if resultado else "Faixa não identificada")
 
-            # Se não há mais não identificados, finalize o loop
-            if not nao_identificados:
-                break
-
-            # Gerar novos regex para os dados não identificados
-            novos_regex = gerar_regex(nao_identificados)
-            regex_map.update(novos_regex)  # Atualiza o mapa de regex
-
+        print("Dados não identificados:", nao_identificados)
         return jsonify({"resultados": resultados, "nao_identificados": nao_identificados}), 200
     except Exception as e:
         print("Erro interno:", e)
