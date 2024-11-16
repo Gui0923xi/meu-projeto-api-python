@@ -4,35 +4,24 @@ import re
 
 app = Flask(__name__)
 
-# Configurar sua API Key do OpenAI
+import openai
+
 openai.api_key = "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"
 
-def obter_regex_chatgpt(valores):
-    """
-    Envia os valores para o ChatGPT e retorna regex gerados dinamicamente.
-    """
-    prompt = f"""
-    Gere expressões regulares (regex) para identificar as seguintes faixas de valores:
-    {valores}
-
-    Retorne um JSON no formato:
-    {{
-        "regex1": "Descrição da faixa 1",
-        "regex2": "Descrição da faixa 2",
-        ...
-    }}
-    """
+def gerar_regex(dados):
     try:
-        response = openai.Completion.create(
-            model="text-davinci-003",
-            prompt=prompt,
-            max_tokens=300,
-            temperature=0.5
+        prompt = f"Crie regex para os seguintes dados: {dados}"
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "Você é um assistente especializado em gerar expressões regulares (regex)."},
+                {"role": "user", "content": prompt}
+            ]
         )
-        regex_data = response["choices"][0]["text"]
-        return eval(regex_data.strip())  # Converte a resposta em dicionário
+        return response['choices'][0]['message']['content']
     except Exception as e:
-        return {"error": f"Erro ao gerar regex: {str(e)}"}
+        return f"Erro ao gerar regex: {str(e)}"
+
 
 def limpar_e_mapear(valor, faixas):
     """
