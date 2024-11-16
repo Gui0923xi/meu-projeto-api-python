@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 import re
+import json
 
 app = Flask(__name__)
 
@@ -46,16 +47,20 @@ def gerar_regex(dados):
 @app.route('/update-regex', methods=['POST'])
 def atualizar_regex():
     try:
-        # Recebe os dados enviados pelo cliente
-        dados = request.json.get("dados", [])
-        if not dados:
-            return jsonify({"erro": "Nenhum dado fornecido"}), 400
+        # Recebe os regex enviados pelo cliente como texto separado por vírgulas
+        raw_regex = request.json.get("regex", "")
+        if not raw_regex:
+            return jsonify({"erro": "Nenhum regex fornecido"}), 400
 
-        # Gera os regex dinamicamente
-        regex_gerados = gerar_regex(dados)
+        # Divide o texto em partes separadas por vírgula e converte para dicionário
+        regex_str = raw_regex.replace("}{", "},{")  # Ajusta casos sem separação clara
+        regex_list = regex_str.split(",")  # Divide pelos delimitadores de vírgula
+        regex_dict = json.loads("{" + ",".join(regex_list) + "}")
 
-        # Retorna apenas os regex gerados
-        return jsonify(regex_gerados), 200
+        global regex_map
+        regex_map = regex_dict  # Atualiza o regex_map com o dicionário enviado
+
+        return jsonify({"mensagem": "Regex atualizado com sucesso", "regex": regex_map}), 200
 
     except Exception as e:
         return jsonify({"erro": f"Erro ao atualizar regex: {str(e)}"}), 500
@@ -64,12 +69,12 @@ def atualizar_regex():
 @app.route('/process', methods=['POST'])
 def processar_dados():
     try:
-        # Recebe os dados enviados pelo cliente
+        # Recebe os dados enviados pelo cliente como texto separado por vírgulas
         dados_raw = request.json.get("dados", [])
         if not dados_raw:
             return jsonify({"erro": "Nenhum dado fornecido"}), 400
 
-        # Dividir os dados em itens separados por vírgula
+        # Divide os dados em itens separados por vírgula
         dados = []
         for linha in dados_raw:
             if isinstance(linha, str):
