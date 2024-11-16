@@ -26,15 +26,13 @@ def processar_dados_em_massa():
     if not isinstance(entrada, list):
         return jsonify({"error": "Esperado uma lista no campo 'dados'"}), 400
 
-    # Processa cada item na lista
-    resultado = []
-    for item in entrada:
-        valor_sujo = item.get("Valor sujo", "")
-        faixa_padronizada = limpar_e_mapear(valor_sujo)
-        resultado.append({"Valor sujo": valor_sujo, "Faixa padronizada": faixa_padronizada})
+    # Processa cada item no array
+    resultado = [{"Valor sujo": item.get("Valor sujo", ""), 
+                  "Faixa padronizada": limpar_e_mapear(item.get("Valor sujo", ""))} 
+                 for item in entrada]
 
-    # Retorna o resultado como JSON
-    return jsonify(resultado)
+    # Consolidar o retorno em um único JSON
+    return jsonify({"resultados": resultado})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
