@@ -3,109 +3,87 @@ import re
 
 app = Flask(__name__)
 
+# Armazena os regex gerados dinamicamente
+regex_map = {}
+
 # Função para gerar regex dinamicamente com base nos dados
 def gerar_regex(dados):
-    """
-    Gera um dicionário de regex baseados nos padrões de entrada.
-    """
+    global regex_map
     regex_map = {}
 
     for item in dados:
-        # Entre R$X e R$Y
+        # Detecta faixas numéricas: Exemplo "Entre R$2.801 e R$3.200"
         if re.search(r"r\$[0-9]+[.,]?[0-9]*_a_r\$[0-9]+[.,]?[0-9]*", item):
-            matches = re.findall(r"r\$[0-9]+[.,]?[0-9]*_a_r\$[0-9]+[.,]?[0-9]*", item)
-            for match in matches:
-                valor1, valor2 = match.replace("r$", "").replace("_a_", " ").split(" ")
-                regex_map[rf"{re.escape(match)}"] = f"Entre R${valor1} e R${valor2}"
-
-        # Maior que R$X
-        elif re.search(r"maior_que_r\$[0-9]+[.,]?[0-9]*", item):
-            matches = re.findall(r"maior_que_r\$[0-9]+[.,]?[0-9]*", item)
-            for match in matches:
-                valor = match.replace("maior_que_r$", "")
-                regex_map[rf"{re.escape(match)}"] = f"Maior que R${valor}"
-
-        # Até R$X
-        elif re.search(r"até_r\$[0-9]+[.,]?[0-9]*", item):
-            matches = re.findall(r"até_r\$[0-9]+[.,]?[0-9]*", item)
-            for match in matches:
-                valor = match.replace("até_r$", "")
-                regex_map[rf"{re.escape(match)}"] = f"Até R${valor}"
-
-        # Valor isolado como R$X
+            match = re.findall(r"r\$[0-9]+[.,]?[0-9]*_a_r\$[0-9]+[.,]?[0-9]*", item)
+            for m in match:
+                valor1, valor2 = m.replace("r$", "").replace("_a_", " ").split(" ")
+                regex_map[rf"{re.escape(m)}"] = f"Entre R${valor1} e R${valor2}"
+        
+        # Detecta números soltos com "Até R$X"
+        elif re.search(r"até_r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE):
+            match = re.findall(r"até_r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE)
+            for m in match:
+                valor = m.replace("até_r$", "")
+                regex_map[rf"{re.escape(m)}"] = f"Abaixo de R${valor}"
+        
+        # Detecta números soltos com "R$X"
         elif re.search(r"r\$[0-9]+[.,]?[0-9]*", item):
-            matches = re.findall(r"r\$[0-9]+[.,]?[0-9]*", item)
-            for match in matches:
-                regex_map[rf"{re.escape(match)}"] = f"Valor R${match.replace('r$', '')}"
-
+            match = re.findall(r"r\$[0-9]+[.,]?[0-9]*", item)
+            for m in match:
+                valor = m.replace("r$", "")
+                regex_map[rf"{re.escape(m)}"] = f"Abaixo de R${valor}"
+        
+        # Detecta números soltos com "Maior que R$X"
+        elif re.search(r"maior_que_r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE):
+            match = re.findall(r"maior_que_r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE)
+            for m in match:
+                valor = m.replace("maior_que_r$", "")
+                regex_map[rf"{re.escape(m)}"] = f"Maior que R${valor}"
+    
     return regex_map
-
 
 # Endpoint para atualizar os regex
 @app.route('/update-regex', methods=['POST'])
 def atualizar_regex():
-    """
-    Recebe uma lista de dados e gera regex dinamicamente.
-    """
     try:
+        # Recebe os dados enviados pelo cliente
         dados = request.json.get("dados", [])
-        if isinstance(dados, str):
-            dados = [item.strip().lower() for item in dados.split(",")]  # Padroniza os dados
+        if not dados:
+            return jsonify({"erro": "Nenhum dado fornecido"}), 400
 
-        if not dados or not isinstance(dados, list):
-            return jsonify({"erro": "Nenhum dado válido fornecido"}), 400
-
+        # Gera os regex dinamicamente
         regex_gerados = gerar_regex(dados)
-        return jsonify(regex_gerados), 200  # Retorna apenas o mapa de regex
+
+        return jsonify({"mensagem": "Regex atualizado com sucesso", "regex": regex_gerados}), 200
 
     except Exception as e:
         return jsonify({"erro": f"Erro ao atualizar regex: {str(e)}"}), 500
 
-
 # Endpoint para processar os dados
 @app.route('/process', methods=['POST'])
 def processar_dados():
-    """
-    Processa os dados recebidos aplicando os regex enviados na requisição.
-    """
     try:
-        payload = request.json
-        print("Payload recebido:", payload)
+        # Recebe os dados enviados pelo cliente
+        dados = request.json.get("dados", [])
+        if not dados:
+            return jsonify({"erro": "Nenhum dado fornecido"}), 400
 
-        dados = payload.get("dados", [])
-        regex_map = payload.get("regex", {})
-
-        if isinstance(dados, str):
-            dados = [item.strip().lower() for item in dados.split(",")]
-
-        if not dados or not isinstance(dados, list):
-            return jsonify({"erro": "Nenhum dado válido fornecido"}), 400
-
-        if not regex_map or not isinstance(regex_map, dict):
-            return jsonify({"erro": "Nenhum regex válido fornecido"}), 400
-
+        # Aplica os regex nos dados
         resultados = []
-        nao_identificados = []
-
         for item in dados:
-            print("Item sendo processado:", item)
             resultado = []
             for padrao, descricao in regex_map.items():
-                try:
-                    if re.search(padrao, item):
+                if re.search(padrao, item):  # Verifica se o item corresponde ao regex
+                    if descricao not in resultado:  # Evita duplicados na mesma faixa
                         resultado.append(descricao)
-                except re.error as regex_error:
-                    print(f"Erro ao aplicar regex '{padrao}': {regex_error}")
             if not resultado:
-                nao_identificados.append(item)
-            resultados.append(", ".join(resultado) if resultado else "Faixa não identificada")
+                resultado.append("Faixa não identificada")
+            resultados.append(", ".join(resultado))
 
-        print("Dados não identificados:", nao_identificados)
-        return jsonify({"resultados": resultados, "nao_identificados": nao_identificados}), 200
+        return jsonify({"resultados": resultados}), 200
+
     except Exception as e:
-        print("Erro interno:", e)
         return jsonify({"erro": f"Erro ao processar os dados: {str(e)}"}), 500
-
 
 if __name__ == '__main__':
     app.run(debug=True)
