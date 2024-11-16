@@ -35,7 +35,7 @@ def gerar_regex(dados):
 @app.route('/update-regex', methods=['POST'])
 def atualizar_regex():
     """
-    Recebe uma lista de dados e gera regex dinamicamente.
+    Recebe uma lista de dados e gera regex dinamicamente, retornando apenas o mapa de regex.
     """
     try:
         dados = request.json.get("dados", [])
@@ -46,10 +46,11 @@ def atualizar_regex():
             return jsonify({"erro": "Nenhum dado válido fornecido"}), 400
 
         regex_gerados = gerar_regex(dados)
-        return jsonify({"mensagem": "Regex atualizado com sucesso", "regex": regex_gerados}), 200
+        return jsonify(regex_gerados), 200  # Retorna apenas o mapa de regex
 
     except Exception as e:
         return jsonify({"erro": f"Erro ao atualizar regex: {str(e)}"}), 500
+
 
 # Endpoint para processar os dados
 @app.route('/process', methods=['POST'])
