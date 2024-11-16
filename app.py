@@ -9,11 +9,11 @@ def gerar_regex_automatico(valores):
     """
     faixas = {}
     for valor in valores:
-        # Limpando o valor
+        # Limpando o valor para facilitar a análise
         valor_limpo = re.sub(r'[^\w\s,.R$]', '', valor.lower().strip())
         valor_limpo = re.sub(r'[.,]', '', valor_limpo)
         
-        # Analisando padrões comuns
+        # Identificar padrões numéricos e criar regex apropriado
         if "abaixo de" in valor_limpo or "até" in valor_limpo or "menor que" in valor_limpo:
             limite = re.search(r'\d+', valor_limpo)
             if limite:
@@ -31,6 +31,13 @@ def gerar_regex_automatico(valores):
             if limite:
                 regex = rf"(acima_de|maior_que|maior).*{limite.group(0)}"
                 faixas[regex] = f"Acima de R${limite.group(0)}"
+
+        else:
+            # Caso nenhum padrão específico seja encontrado, capturar genéricos
+            numeros = re.findall(r'\d+', valor_limpo)
+            if len(numeros) == 1:
+                regex = rf".*{numeros[0]}.*"
+                faixas[regex] = f"Contém o valor R${numeros[0]}"
 
     return faixas
 
@@ -68,6 +75,7 @@ def processar_dados_em_massa():
         faixa = limpar_e_mapear(valor, faixas)
         faixas_padronizadas.append(faixa)
     
+    # Retornar apenas os dados padronizados, separados por vírgula
     return jsonify(", ".join(faixas_padronizadas))
 
 
