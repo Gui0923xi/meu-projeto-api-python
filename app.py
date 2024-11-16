@@ -35,7 +35,7 @@ def gerar_regex(dados):
 @app.route('/update-regex', methods=['POST'])
 def atualizar_regex():
     """
-    Recebe uma lista de dados e gera regex dinamicamente, retornando apenas o mapa de regex.
+    Recebe uma lista de dados e gera regex dinamicamente.
     """
     try:
         dados = request.json.get("dados", [])
@@ -50,7 +50,6 @@ def atualizar_regex():
 
     except Exception as e:
         return jsonify({"erro": f"Erro ao atualizar regex: {str(e)}"}), 500
-
 
 # Endpoint para processar os dados
 @app.route('/process', methods=['POST'])
@@ -68,7 +67,8 @@ def processar_dados():
 
         # Verifica se os dados foram enviados como string (separados por vírgulas)
         if isinstance(dados, str):
-            dados = [item.strip().lower() for item in dados.split(",")]  # Padroniza os dados
+            # Converte a string separada por vírgulas em lista e padroniza
+            dados = [item.strip().lower() for item in dados.split(",")]
 
         if not dados or not isinstance(dados, list):
             return jsonify({"erro": "Nenhum dado válido fornecido"}), 400
@@ -79,27 +79,22 @@ def processar_dados():
         # Processa os dados aplicando os regex
         resultados = []
         for item in dados:
+            print("Item sendo processado:", item)  # Log do item
             resultado = []
             for padrao, descricao in regex_map.items():
                 try:
+                    print(f"Aplicando regex: {padrao} ao item: {item}")  # Log do regex aplicado
                     if re.search(padrao, item):
                         resultado.append(descricao)
                 except re.error as regex_error:
                     print(f"Erro ao aplicar regex '{padrao}': {regex_error}")
             resultados.append(", ".join(resultado) if resultado else "Faixa não identificada")
 
+        print("Resultados finais:", resultados)  # Log dos resultados finais
         return jsonify({"resultados": resultados}), 200
     except Exception as e:
         print("Erro interno:", e)
         return jsonify({"erro": f"Erro ao processar os dados: {str(e)}"}), 500
-
-# Endpoint para consultar os regex atuais
-@app.route('/get-regex', methods=['GET'])
-def consultar_regex():
-    """
-    Retorna os regex atualmente configurados.
-    """
-    return jsonify({"mensagem": "Consulte o endpoint /update-regex para gerar novos regex"}), 200
 
 if __name__ == '__main__':
     app.run(debug=True)
