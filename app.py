@@ -1,20 +1,15 @@
-import os
 from flask import Flask, request, jsonify
-import pandas as pd
 import re
 
 app = Flask(__name__)
 
-# Definição das faixas para o processamento
+# Definição das faixas com regex automático
 faixas = {
-  r"(até|abaixo_de|ate|menor_que|menor)[ _de]*r?\$?\s*2[.,]?800": "Abaixo de R$2.800",
+    r"(até|abaixo_de|ate|menor_que|menor)[ _de]*r?\$?\s*2[.,]?800": "Abaixo de R$2.800",
     r"(entre|r?)\s*r?\$?\s*2[.,]?801[ _a_e]*r?\$?\s*3[.,]?200": "Entre R$2.801 e R$3.200",
     r"(entre|r?)\s*r?\$?\s*3[.,]?201[ _a_e]*r?\$?\s*3[.,]?600": "Entre R$3.201 e R$3.600",
     r"(entre|r?)\s*r?\$?\s*3[.,]?601[ _a_e]*r?\$?\s*4[.,]?000": "Entre R$3.601 e R$4.000",
-    r"(entre|r?)\s*r?\$?\s*4[.,]?001[ _a_e]*r?\$?\s*4[.,]?400": "Entre R$4.001 e R$4.400",
-    r"(entre|r?)\s*r?\$?\s*4[.,]?401[ _a_e]*r?\$?\s*4[.,]?800": "Entre R$4.401 e R$4.800",
-    r"(maior_que|acima_de|maior|acima)[ _de]*r?\$?\s*4[.,]?000": "Acima de R$4.000",
-    r"(maior_que|acima_de|maior|acima)[ _de]*r?\$?\s*4[.,]?800": "Acima de R$4.800"
+    r"(maior_que|acima_de|maior|acima)[ _de]*r?\$?\s*4[.,]?000": "Acima de R$4.000"
 }
 
 def limpar_e_mapear(valor):
@@ -25,16 +20,21 @@ def limpar_e_mapear(valor):
     return "Faixa não identificada"
 
 @app.route('/process', methods=['POST'])
-def process():
-    # Recebe uma lista de valores "sujos" em um array JSON
-    dados = request.json.get("dados", [])
-    
-    # Processa cada valor na lista e mapeia para a faixa padronizada correspondente
-    resultados = [{"Valor sujo": item["Valor sujo"], "Faixa padronizada": limpar_e_mapear(item["Valor sujo"])} for item in dados]
-    
-    # Retorna os resultados como uma lista JSON
-    return jsonify(resultados)
+def processar_dados_em_massa():
+    # Recebe a lista de dados do JSON
+    entrada = request.json.get("dados", [])
+    if not isinstance(entrada, list):
+        return jsonify({"error": "Esperado uma lista no campo 'dados'"}), 400
+
+    # Processa cada item na lista
+    resultado = []
+    for item in entrada:
+        valor_sujo = item.get("Valor sujo", "")
+        faixa_padronizada = limpar_e_mapear(valor_sujo)
+        resultado.append({"Valor sujo": valor_sujo, "Faixa padronizada": faixa_padronizada})
+
+    # Retorna o resultado como JSON
+    return jsonify(resultado)
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=5000)
