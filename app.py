@@ -21,17 +21,22 @@ def limpar_e_mapear(valor):
 
 @app.route('/process', methods=['POST'])
 def processar_dados_em_massa():
-    # Recebe a lista de dados do JSON
+    # Recebe a string consolidada no campo "dados"
     entrada = request.json.get("dados", [])
-    if not isinstance(entrada, list):
-        return jsonify({"error": "Esperado uma lista no campo 'dados'"}), 400
+    
+    # Garantir que a entrada seja válida
+    if not isinstance(entrada, list) or len(entrada) == 0 or not isinstance(entrada[0], str):
+        return jsonify({"error": "Esperado um array contendo uma única string no campo 'dados'"}), 400
+    
+    # Divide a string em itens separados por vírgula
+    valores = entrada[0].split(',')
+    
+    # Processa cada valor da lista
+    resultado = [{"Valor sujo": valor.strip(), 
+                  "Faixa padronizada": limpar_e_mapear(valor.strip())} 
+                 for valor in valores]
 
-    # Processa cada item no array
-    resultado = [{"Valor sujo": item.get("Valor sujo", ""), 
-                  "Faixa padronizada": limpar_e_mapear(item.get("Valor sujo", ""))} 
-                 for item in entrada]
-
-    # Consolidar o retorno em um único JSON
+    # Retorna o resultado consolidado
     return jsonify({"resultados": resultado})
 
 if __name__ == '__main__':
