@@ -3,23 +3,6 @@ import re
 
 app = Flask(__name__)
 
-# Endpoint para gerar regex
-@app.route('/update-regex', methods=['POST'])
-def atualizar_regex():
-    """
-    Recebe uma lista de dados e gera regex dinamicamente.
-    """
-    try:
-        dados = request.json.get("dados", [])
-        if not dados or not isinstance(dados, list):
-            return jsonify({"erro": "Nenhum dado válido fornecido"}), 400
-
-        regex_map = gerar_regex(dados)
-        return jsonify({"mensagem": "Regex atualizado com sucesso", "regex": regex_map}), 200
-
-    except Exception as e:
-        return jsonify({"erro": f"Erro ao atualizar regex: {str(e)}"}), 500
-
 # Função para gerar regex dinamicamente com base nos dados
 def gerar_regex(dados):
     """
@@ -48,15 +31,43 @@ def gerar_regex(dados):
 
     return regex_map
 
-# Endpoint para processar dados com regex enviado na requisição
+# Endpoint para atualizar os regex
+@app.route('/update-regex', methods=['POST'])
+def atualizar_regex():
+    """
+    Recebe uma lista de dados e gera regex dinamicamente.
+    """
+    try:
+        dados = request.json.get("dados", [])
+        if isinstance(dados, str):
+            dados = [item.strip() for item in dados.split(",")]
+
+        if not dados or not isinstance(dados, list):
+            return jsonify({"erro": "Nenhum dado válido fornecido"}), 400
+
+        regex_gerados = gerar_regex(dados)
+        return jsonify({"mensagem": "Regex atualizado com sucesso", "regex": regex_gerados}), 200
+
+    except Exception as e:
+        return jsonify({"erro": f"Erro ao atualizar regex: {str(e)}"}), 500
+
+# Endpoint para processar os dados
 @app.route('/process', methods=['POST'])
 def processar_dados():
     """
     Processa os dados recebidos aplicando os regex enviados na requisição.
     """
     try:
-        dados = request.json.get("dados", [])
-        regex_map = request.json.get("regex", {})
+        payload = request.json
+        print("Payload recebido:", payload)  # Log do payload recebido
+
+        # Recupera os dados e regex do payload
+        dados = payload.get("dados", [])
+        regex_map = payload.get("regex", {})
+
+        # Verifica se os dados foram enviados como string (separados por vírgulas)
+        if isinstance(dados, str):
+            dados = [item.strip() for item in dados.split(",")]  # Converte string para lista
 
         if not dados or not isinstance(dados, list):
             return jsonify({"erro": "Nenhum dado válido fornecido"}), 400
@@ -64,18 +75,30 @@ def processar_dados():
         if not regex_map or not isinstance(regex_map, dict):
             return jsonify({"erro": "Nenhum regex válido fornecido"}), 400
 
+        # Processa os dados aplicando os regex
         resultados = []
         for item in dados:
             resultado = []
             for padrao, descricao in regex_map.items():
-                if re.search(padrao, item):
-                    resultado.append(descricao)
+                try:
+                    if re.search(padrao, item):
+                        resultado.append(descricao)
+                except re.error as regex_error:
+                    print(f"Erro ao aplicar regex '{padrao}': {regex_error}")
             resultados.append(", ".join(resultado) if resultado else "Faixa não identificada")
 
         return jsonify({"resultados": resultados}), 200
-
     except Exception as e:
+        print("Erro interno:", e)
         return jsonify({"erro": f"Erro ao processar os dados: {str(e)}"}), 500
+
+# Endpoint para consultar os regex atuais
+@app.route('/get-regex', methods=['GET'])
+def consultar_regex():
+    """
+    Retorna os regex atualmente configurados.
+    """
+    return jsonify({"mensagem": "Consulte o endpoint /update-regex para gerar novos regex"}), 200
 
 if __name__ == '__main__':
     app.run(debug=True)
