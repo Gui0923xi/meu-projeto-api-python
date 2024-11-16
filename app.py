@@ -8,29 +8,30 @@ regex_map = {}
 
 # Função para gerar regex dinamicamente com base nos dados
 def gerar_regex(dados):
+    """
+    Gera um dicionário de regex baseados nos padrões de entrada.
+    """
     global regex_map
-    # Limpa o mapa de regex antes de gerar novos
-    regex_map = {}
+    regex_map = {}  # Limpa o mapa de regex antes de gerar novos
 
-    # Analisamos os dados para identificar padrões
     for item in dados:
         if re.search(r"r\$[0-9]+[.,]?[0-9]*_a_r\$[0-9]+[.,]?[0-9]*", item):
-            match = re.findall(r"r\$[0-9]+[.,]?[0-9]*_a_r\$[0-9]+[.,]?[0-9]*", item)
-            for m in match:
-                valor1, valor2 = m.replace("r$", "").replace("_a_", " ").split(" ")
-                regex_map[rf"{re.escape(m)}"] = f"Entre R${valor1} e R${valor2}"
+            matches = re.findall(r"r\$[0-9]+[.,]?[0-9]*_a_r\$[0-9]+[.,]?[0-9]*", item)
+            for match in matches:
+                valor1, valor2 = match.replace("r$", "").replace("_a_", " ").split(" ")
+                regex_map[rf"{re.escape(match)}"] = f"Entre R${valor1} e R${valor2}"
 
         elif re.search(r"maior_que_r\$[0-9]+[.,]?[0-9]*", item):
-            match = re.findall(r"maior_que_r\$[0-9]+[.,]?[0-9]*", item)
-            for m in match:
-                valor = m.replace("maior_que_r$", "")
-                regex_map[rf"{re.escape(m)}"] = f"Maior que R${valor}"
+            matches = re.findall(r"maior_que_r\$[0-9]+[.,]?[0-9]*", item)
+            for match in matches:
+                valor = match.replace("maior_que_r$", "")
+                regex_map[rf"{re.escape(match)}"] = f"Maior que R${valor}"
 
         elif re.search(r"até_r\$[0-9]+[.,]?[0-9]*", item):
-            match = re.findall(r"até_r\$[0-9]+[.,]?[0-9]*", item)
-            for m in match:
-                valor = m.replace("até_r$", "")
-                regex_map[rf"{re.escape(m)}"] = f"Até R${valor}"
+            matches = re.findall(r"até_r\$[0-9]+[.,]?[0-9]*", item)
+            for match in matches:
+                valor = match.replace("até_r$", "")
+                regex_map[rf"{re.escape(match)}"] = f"Até R${valor}"
 
     return regex_map
 
@@ -38,15 +39,15 @@ def gerar_regex(dados):
 # Endpoint para atualizar os regex
 @app.route('/update-regex', methods=['POST'])
 def atualizar_regex():
+    """
+    Recebe uma lista de dados e gera regex dinamicamente.
+    """
     try:
-        # Recebe os dados enviados pelo cliente
         dados = request.json.get("dados", [])
-        if not dados:
-            return jsonify({"erro": "Nenhum dado fornecido"}), 400
+        if not dados or not isinstance(dados, list):
+            return jsonify({"erro": "Nenhum dado válido fornecido"}), 400
 
-        # Gera os regex dinamicamente
         regex_gerados = gerar_regex(dados)
-
         return jsonify({"mensagem": "Regex atualizado com sucesso", "regex": regex_gerados}), 200
 
     except Exception as e:
@@ -56,27 +57,38 @@ def atualizar_regex():
 # Endpoint para processar os dados
 @app.route('/process', methods=['POST'])
 def processar_dados():
+    """
+    Processa os dados recebidos aplicando os regex gerados.
+    """
     try:
-        # Recebe os dados enviados pelo cliente
         dados = request.json.get("dados", [])
-        if not dados:
-            return jsonify({"erro": "Nenhum dado fornecido"}), 400
+        if not dados or not isinstance(dados, list):
+            return jsonify({"erro": "Nenhum dado válido fornecido"}), 400
 
-        # Aplica os regex nos dados
+        if not regex_map:
+            return jsonify({"erro": "Nenhum regex foi configurado. Atualize os regex primeiro."}), 400
+
         resultados = []
         for item in dados:
             resultado = []
             for padrao, descricao in regex_map.items():
                 if re.search(padrao, item):
                     resultado.append(descricao)
-            if not resultado:
-                resultado.append("Faixa não identificada")
-            resultados.append(", ".join(resultado))
+            resultados.append(", ".join(resultado) if resultado else "Faixa não identificada")
 
         return jsonify({"resultados": resultados}), 200
 
     except Exception as e:
         return jsonify({"erro": f"Erro ao processar os dados: {str(e)}"}), 500
+
+
+# Endpoint para consultar os regex atuais
+@app.route('/get-regex', methods=['GET'])
+def consultar_regex():
+    """
+    Retorna os regex atualmente configurados.
+    """
+    return jsonify({"regex": regex_map}), 200
 
 
 if __name__ == '__main__':
