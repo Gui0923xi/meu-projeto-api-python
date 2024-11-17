@@ -12,33 +12,37 @@ def gerar_regex(dados):
     novos_regex = {}
 
     for item in dados:
-        # Detecta faixas numéricas: Exemplo "Entre R$2.801 e R$3.200"
-        if re.search(r"r\$[0-9]+[.,]?[0-9]*_a_r\$[0-9]+[.,]?[0-9]*", item):
-            match = re.findall(r"r\$[0-9]+[.,]?[0-9]*_a_r\$[0-9]+[.,]?[0-9]*", item)
+        # Detecta faixas numéricas: Exemplo "De R$2.001 a R$2.400" ou "Entre R$2.801 e R$3.200"
+        if re.search(r"(de|entre)\s*r\$[0-9]+[.,]?[0-9]*\s*(a|e)\s*r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE):
+            match = re.findall(r"(de|entre)\s*r\$([0-9]+[.,]?[0-9]*)\s*(a|e)\s*r\$([0-9]+[.,]?[0-9]*)", item, re.IGNORECASE)
             for m in match:
-                valor1, valor2 = m.replace("r$", "").replace("_a_", " ").split(" ")
-                novos_regex[rf"{re.escape(m)}"] = f"Entre R${valor1} e R${valor2}"
+                valor1, valor2 = m[1], m[3]
+                regex_key = rf"r\$?{re.escape(valor1)}.*(a|e).*r\$?{re.escape(valor2)}"
+                novos_regex[regex_key] = f"Entre R${valor1} e R${valor2}"
 
         # Detecta números soltos com "Até R$X"
-        elif re.search(r"até_r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE):
-            match = re.findall(r"até_r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE)
+        elif re.search(r"até\s*r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE):
+            match = re.findall(r"até\s*r\$([0-9]+[.,]?[0-9]*)", item, re.IGNORECASE)
             for m in match:
-                valor = m.replace("até_r$", "")
-                novos_regex[rf"{re.escape(m)}"] = f"Abaixo de R${valor}"
-
-        # Detecta números soltos com "R$X"
-        elif re.search(r"r\$[0-9]+[.,]?[0-9]*", item):
-            match = re.findall(r"r\$[0-9]+[.,]?[0-9]*", item)
-            for m in match:
-                valor = m.replace("r$", "")
-                novos_regex[rf"{re.escape(m)}"] = f"Abaixo de R${valor}"
+                valor = m
+                regex_key = rf"até\s*r\$?{re.escape(valor)}"
+                novos_regex[regex_key] = f"Abaixo de R${valor}"
 
         # Detecta números soltos com "Maior que R$X"
-        elif re.search(r"maior_que_r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE):
-            match = re.findall(r"maior_que_r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE)
+        elif re.search(r"maior\s*que\s*r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE):
+            match = re.findall(r"maior\s*que\s*r\$([0-9]+[.,]?[0-9]*)", item, re.IGNORECASE)
             for m in match:
-                valor = m.replace("maior_que_r$", "")
-                novos_regex[rf"{re.escape(m)}"] = f"Maior que R${valor}"
+                valor = m
+                regex_key = rf"maior\s*que\s*r\$?{re.escape(valor)}"
+                novos_regex[regex_key] = f"Maior que R${valor}"
+
+        # Detecta valores individuais como "R$X"
+        elif re.search(r"r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE):
+            match = re.findall(r"r\$([0-9]+[.,]?[0-9]*)", item, re.IGNORECASE)
+            for m in match:
+                valor = m
+                regex_key = rf"r\$?{re.escape(valor)}"
+                novos_regex[regex_key] = f"Valor R${valor}"
 
     regex_map.update(novos_regex)
     return novos_regex
