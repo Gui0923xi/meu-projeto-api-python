@@ -105,10 +105,14 @@ def atualizar_regex():
         if not dados:
             return jsonify({"erro": "Nenhum dado fornecido"}), 400
 
-        regex_gerados, logs = gerar_regex(dados)
-        return jsonify({"regex_gerados": regex_gerados, "logs": logs}), 200
+        # Gera regex dinamicamente
+        regex_gerados, _ = gerar_regex(dados)
+
+        # Retorna apenas os regex gerados
+        return jsonify(regex_gerados), 200
     except Exception as e:
         return jsonify({"erro": f"Erro ao atualizar regex: {str(e)}"}), 500
+
 
 
 # Endpoint para processar dados
