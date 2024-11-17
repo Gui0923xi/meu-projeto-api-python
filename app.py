@@ -12,6 +12,10 @@ def gerar_regex(dados):
     novos_regex = {}
 
     for item in dados:
+        # Se o item já é coberto por um regex existente, pule
+        if any(re.search(padrao, item) for padrao in regex_map):
+            continue
+
         # Detecta faixas numéricas: Exemplo "De R$2.001 a R$2.400" ou "Entre R$2.801 e R$3.200"
         if re.search(r"(de|entre)\s*r\$[0-9]+[.,]?[0-9]*\s*(a|e)\s*r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE):
             match = re.findall(r"(de|entre)\s*r\$([0-9]+[.,]?[0-9]*)\s*(a|e)\s*r\$([0-9]+[.,]?[0-9]*)", item, re.IGNORECASE)
@@ -113,6 +117,19 @@ def processar_dados():
 
     except Exception as e:
         return jsonify({"erro": f"Erro ao processar os dados: {str(e)}"}), 500
+
+# Endpoint para adicionar regex manualmente
+@app.route('/add-regex', methods=['POST'])
+def adicionar_regex_manual():
+    try:
+        regex_novos = request.json.get("regex", {})
+        if not regex_novos:
+            return jsonify({"erro": "Nenhum regex fornecido"}), 400
+
+        regex_map.update(regex_novos)
+        return jsonify({"mensagem": "Regex adicionados com sucesso"}), 200
+    except Exception as e:
+        return jsonify({"erro": f"Erro ao adicionar regex: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
