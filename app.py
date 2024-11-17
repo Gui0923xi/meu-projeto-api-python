@@ -12,6 +12,16 @@ mapeamento = {
 # Regex gerados dinamicamente
 regex_map = {}
 
+# Função para limpar os dados
+def limpar_dados(dados):
+    dados_limpos = []
+    for dado in dados:
+        dado = dado.strip().lower()  # Remove espaços e normaliza para lowercase
+        dado = re.sub(r"[^\w\s.,$]", "", dado)  # Remove caracteres inválidos
+        dado = re.sub(r"\s+", " ", dado)  # Normaliza espaços múltiplos
+        dados_limpos.append(dado)
+    return dados_limpos
+
 # Função para gerar regex dinamicamente
 def gerar_regex(dados):
     global regex_map
@@ -19,7 +29,6 @@ def gerar_regex(dados):
     logs = []  # Logs para cada faixa processada
 
     for item in dados:
-        item = item.lower().strip()  # Normaliza o texto para evitar erros
         log_item = {"faixa": item, "status": "Não processada", "detalhes": ""}
 
         # Faixas como "Entre R$X e R$Y"
@@ -27,7 +36,7 @@ def gerar_regex(dados):
             match = re.findall(r"(entre|de)\s*r\$\s?([0-9]+[.,]?[0-9]*)\s*(e|a)\s*r\$\s?([0-9]+[.,]?[0-9]*)", item)
             for m in match:
                 valor1, valor2 = m[1], m[3]
-                regex_key = rf"r\$?\s?{re.escape(valor1)}.*(e|a).*r\$?\s?{re.escape(valor2)}"
+                regex_key = rf"r\$\s?{re.escape(valor1)}.*(e|a).*r\$\s?{re.escape(valor2)}"
                 regex_map[regex_key] = f"Entre R${valor1} e R${valor2}"
                 log_item["status"] = "Processada"
                 log_item["detalhes"] = f"Regex gerado: {regex_key}"
@@ -50,7 +59,6 @@ def gerar_regex(dados):
                 log_item["status"] = "Processada"
                 log_item["detalhes"] = f"Regex gerado: {regex_key}"
 
-        # Caso não corresponda a nenhum padrão
         else:
             log_item["detalhes"] = "Nenhum padrão conhecido foi encontrado."
 
@@ -58,16 +66,15 @@ def gerar_regex(dados):
 
     return regex_map, logs
 
-
-# Função para transcrever valores com base no mapeamento
+# Função para transcrever valores
 def transcrever_valores(dados):
     sucesso = []
     nao_identificados = []
     logs = []
 
     for item in dados:
-        item_original = item.strip()  # Preserva a versão original do dado
-        item_normalizado = item_original.lower().strip()  # Normaliza para comparações
+        item_original = item.strip()
+        item_normalizado = item_original.lower().strip()
         resultado = mapeamento.get(item_normalizado)
 
         log_item = {
@@ -80,7 +87,7 @@ def transcrever_valores(dados):
             sucesso.append(resultado)
             log_item["detalhes"] = "Transcrição realizada com sucesso."
         else:
-            # Tratamento de valores específicos no formato "R$X.XXX" ou "R$X,XXX"
+            # Tratamento de valores específicos
             valor_match = re.match(r"^r\$\s?(\d+[.,]?\d*)$", item_normalizado)
             if valor_match:
                 valor = valor_match.group(1).replace(",", ".")
@@ -90,12 +97,11 @@ def transcrever_valores(dados):
                 log_item["detalhes"] = f"Valor específico tratado automaticamente: {resultado}"
             else:
                 nao_identificados.append(item_original)
-                log_item["detalhes"] = "Valor não encontrado no mapeamento ou não segue formato esperado."
+                log_item["detalhes"] = "Valor não encontrado no mapeamento ou regex."
 
         logs.append(log_item)
 
     return sucesso, nao_identificados, logs
-
 
 # Endpoint para atualizar regex
 @app.route('/update-regex', methods=['POST'])
@@ -105,15 +111,12 @@ def atualizar_regex():
         if not dados:
             return jsonify({"erro": "Nenhum dado fornecido"}), 400
 
-        # Gera regex dinamicamente
-        regex_gerados, _ = gerar_regex(dados)
+        dados_limpos = limpar_dados(dados)
+        regex_gerados, _ = gerar_regex(dados_limpos)
 
-        # Retorna apenas os regex gerados
         return jsonify(regex_gerados), 200
     except Exception as e:
         return jsonify({"erro": f"Erro ao atualizar regex: {str(e)}"}), 500
-
-
 
 # Endpoint para processar dados
 @app.route('/process', methods=['POST'])
@@ -162,8 +165,7 @@ def processar_dados():
     except Exception as e:
         return jsonify({"erro": f"Erro ao processar os dados: {str(e)}"}), 500
 
-
-# Endpoint para transcrever dados (última tentativa)
+# Endpoint para transcrever dados
 @app.route('/transcrever', methods=['POST'])
 def transcrever():
     try:
@@ -180,7 +182,6 @@ def transcrever():
 
     except Exception as e:
         return jsonify({"erro": f"Erro ao transcrever os valores: {str(e)}"}), 500
-
 
 if __name__ == '__main__':
     app.run(debug=True)
