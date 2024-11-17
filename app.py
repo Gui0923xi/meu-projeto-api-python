@@ -9,7 +9,7 @@ regex_map = {}
 # Função para gerar regex dinamicamente com base nos dados
 def gerar_regex(dados):
     global regex_map
-    regex_map = {}
+    novos_regex = {}
 
     for item in dados:
         # Detecta faixas numéricas: Exemplo "Entre R$2.801 e R$3.200"
@@ -17,30 +17,31 @@ def gerar_regex(dados):
             match = re.findall(r"r\$[0-9]+[.,]?[0-9]*_a_r\$[0-9]+[.,]?[0-9]*", item)
             for m in match:
                 valor1, valor2 = m.replace("r$", "").replace("_a_", " ").split(" ")
-                regex_map[rf"{re.escape(m)}"] = f"Entre R${valor1} e R${valor2}"
+                novos_regex[rf"{re.escape(m)}"] = f"Entre R${valor1} e R${valor2}"
 
         # Detecta números soltos com "Até R$X"
         elif re.search(r"até_r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE):
             match = re.findall(r"até_r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE)
             for m in match:
                 valor = m.replace("até_r$", "")
-                regex_map[rf"{re.escape(m)}"] = f"Abaixo de R${valor}"
+                novos_regex[rf"{re.escape(m)}"] = f"Abaixo de R${valor}"
 
         # Detecta números soltos com "R$X"
         elif re.search(r"r\$[0-9]+[.,]?[0-9]*", item):
             match = re.findall(r"r\$[0-9]+[.,]?[0-9]*", item)
             for m in match:
                 valor = m.replace("r$", "")
-                regex_map[rf"{re.escape(m)}"] = f"Abaixo de R${valor}"
+                novos_regex[rf"{re.escape(m)}"] = f"Abaixo de R${valor}"
 
         # Detecta números soltos com "Maior que R$X"
         elif re.search(r"maior_que_r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE):
             match = re.findall(r"maior_que_r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE)
             for m in match:
                 valor = m.replace("maior_que_r$", "")
-                regex_map[rf"{re.escape(m)}"] = f"Maior que R${valor}"
+                novos_regex[rf"{re.escape(m)}"] = f"Maior que R${valor}"
 
-    return regex_map
+    regex_map.update(novos_regex)
+    return novos_regex
 
 # Função para dividir texto separado por vírgula em lista
 def split_text(text):
@@ -55,23 +56,14 @@ def atualizar_regex():
         if not dados_raw:
             return jsonify({"erro": "Nenhum dado fornecido"}), 400
 
-        # Log dos dados recebidos
-        print(f"Dados recebidos: {dados_raw}")
-
         # Divide o texto em uma lista
         dados = split_text(dados_raw)
 
-        # Log dos dados após a divisão
-        print(f"Dados divididos: {dados}")
-
-        # Gera os regex dinamicamente
-        regex_gerados = gerar_regex(dados)
-
-        # Log dos regex gerados
-        print(f"Regex gerados: {regex_gerados}")
+        # Gera regex para os novos dados
+        novos_regex = gerar_regex(dados)
 
         # Retorna os regex no formato JSON diretamente utilizável no /process
-        return jsonify(regex_gerados), 200
+        return jsonify(novos_regex), 200
 
     except Exception as e:
         print(f"Erro no /update-regex: {str(e)}")
@@ -79,7 +71,7 @@ def atualizar_regex():
 
 # Endpoint para processar os dados utilizando regex fornecido
 @app.route('/process', methods=['POST'])
-def processar_dados_final():
+def processar_dados():
     try:
         # Recebe os dados e regex enviados pelo cliente
         dados_raw = request.json.get("dados", "")
