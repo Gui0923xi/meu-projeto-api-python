@@ -59,7 +59,8 @@ def atualizar_regex():
         # Gera os regex dinamicamente
         regex_gerados = gerar_regex(dados)
 
-        return jsonify({"regex": regex_gerados}), 200
+        # Retorna apenas o regex limpo, sem mensagens adicionais
+        return jsonify(regex_gerados), 200
 
     except Exception as e:
         return jsonify({"erro": f"Erro ao atualizar regex: {str(e)}"}), 500
