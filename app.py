@@ -6,97 +6,97 @@ app = Flask(__name__)
 # Armazena os regex gerados dinamicamente
 regex_map = {}
 
-# Função para dividir texto separado por vírgula
-def split_text(text):
-    return [item.strip() for item in text.split(",") if item.strip()]
-
 # Função para gerar regex dinamicamente com base nos dados
 def gerar_regex(dados):
     global regex_map
     regex_map = {}  # Limpa o mapa de regex antes de gerar novos
 
     for item in dados:
+        item = item.lower().strip()  # Normaliza o texto para evitar erros
+
+        # Prioriza faixas "Entre R$X e R$Y"
         if re.search(r"r\$[0-9]+[.,]?[0-9]*_a_r\$[0-9]+[.,]?[0-9]*", item):
             match = re.findall(r"r\$[0-9]+[.,]?[0-9]*_a_r\$[0-9]+[.,]?[0-9]*", item)
             for m in match:
-                valor1, valor2 = m.replace("r$", "").replace("_a_", " ").split(" ")
-                regex_map[rf"{re.escape(m)}"] = f"Entre R${valor1} e R${valor2}"
+                if m not in regex_map:  # Evita duplicatas
+                    valor1, valor2 = m.replace("r$", "").replace("_a_", " ").split(" ")
+                    regex_map[rf"{re.escape(m)}"] = f"Entre R${valor1} e R${valor2}"
 
+        # Trata valores do tipo "maior_que_R$X" -> "Acima de R$X"
         elif re.search(r"maior_que_r\$[0-9]+[.,]?[0-9]*", item):
             match = re.findall(r"maior_que_r\$[0-9]+[.,]?[0-9]*", item)
             for m in match:
-                valor = m.replace("maior_que_r$", "")
-                regex_map[rf"{re.escape(m)}"] = f"Maior que R${valor}"
+                if m not in regex_map:
+                    valor = m.replace("maior_que_r$", "")
+                    regex_map[rf"{re.escape(m)}"] = f"Acima de R${valor}"
 
+        # Trata valores do tipo "até_R$X" -> "Abaixo de R$X"
         elif re.search(r"até_r\$[0-9]+[.,]?[0-9]*", item):
             match = re.findall(r"até_r\$[0-9]+[.,]?[0-9]*", item)
             for m in match:
-                valor = m.replace("até_r$", "")
-                regex_map[rf"{re.escape(m)}"] = f"Abaixo de R${valor}"
+                if m not in regex_map:
+                    valor = m.replace("até_r$", "")
+                    regex_map[rf"{re.escape(m)}"] = f"Abaixo de R${valor}"
+
+        # Trata números soltos como "R$X" -> Adiciona contexto "Abaixo de R$X" (padrão)
+        elif re.match(r"^r\$[0-9]+[.,]?[0-9]*$", item):
+            if item not in regex_map:
+                valor = item.replace("r$", "")
+                regex_map[rf"{re.escape(item)}"] = f"Abaixo de R${valor}"
 
     return regex_map
+
 
 # Endpoint para atualizar os regex
 @app.route('/update-regex', methods=['POST'])
 def atualizar_regex():
     try:
         # Recebe os dados enviados pelo cliente
-        dados_raw = request.json.get("dados", "")
-        if not dados_raw:
+        dados = request.json.get("dados", "").split(",")
+        if not dados:
             return jsonify({"erro": "Nenhum dado fornecido"}), 400
-
-        # Divide os dados em itens separados por vírgula
-        dados = split_text(dados_raw)
 
         # Gera os regex dinamicamente
         regex_gerados = gerar_regex(dados)
 
-        return jsonify(regex_gerados), 200
+        return jsonify({"regex": regex_gerados}), 200
 
     except Exception as e:
         return jsonify({"erro": f"Erro ao atualizar regex: {str(e)}"}), 500
+
 
 # Endpoint para processar os dados
 @app.route('/process', methods=['POST'])
 def processar_dados():
     try:
-        # Recebe os dados e regex enviados pelo cliente
-        dados_raw = request.json.get("dados", "")
-        regex_map = request.json.get("regex", {})
-        if not dados_raw or not regex_map:
+        # Recebe os dados enviados pelo cliente
+        dados = request.json.get("dados", "").split(",")
+        regex = request.json.get("regex", {})
+
+        if not dados or not regex:
             return jsonify({"erro": "Dados ou regex não fornecidos"}), 400
 
-        # Divide os dados em itens separados por vírgula
-        dados = split_text(dados_raw)
-
-        resultados_sucesso = []
-        resultados_nao_encontrados = []
+        # Aplica os regex nos dados
+        resultados = {"sucesso": [], "nao_identificados": []}
 
         for item in dados:
-            matches = []  # Lista para armazenar todas as correspondências para o item
-            for padrao, descricao in regex_map.items():
+            item = item.strip()
+            identificado = False
+            for padrao, descricao in regex.items():
                 if re.search(padrao, item):
-                    matches.append(descricao)
+                    resultados["sucesso"].append({"dado": item, "faixa": descricao})
+                    identificado = True
+                    break  # Garante que cada dado seja mapeado apenas uma vez
+            if not identificado:
+                resultados["nao_identificados"].append(item)
 
-            # Escolher a correspondência mais específica (priorizando faixas)
-            if not matches:
-                resultados_nao_encontrados.append(item)
-            else:
-                # Ordenar correspondências por comprimento (mais específica = mais detalhada)
-                matches.sort(key=len, reverse=True)
-                resultados_sucesso.append(matches[0])  # Armazena apenas a descrição mais específica
-
-        # Junta os sucessos e não identificados em strings únicas, separados por vírgula
-        sucesso_em_uma_celula = ", ".join(resultados_sucesso)
-        nao_identificados_em_uma_celula = ", ".join(resultados_nao_encontrados)
-
-        return jsonify({
-            "sucesso": sucesso_em_uma_celula,
-            "nao_identificados": nao_identificados_em_uma_celula
-        }), 200
+        # Consolida os resultados em formato único
+        resultados["sucesso"] = [res["faixa"] for res in resultados["sucesso"]]
+        return jsonify(resultados), 200
 
     except Exception as e:
         return jsonify({"erro": f"Erro ao processar os dados: {str(e)}"}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True)
