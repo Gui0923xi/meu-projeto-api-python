@@ -106,9 +106,13 @@ def processar_dados():
         logs = []  # Lista para armazenar os logs detalhados
 
         for item in dados:
-            item = item.strip()
+            item_original = item.strip()  # Preserva a faixa original para log
+            item = item_original.lower()  # Normaliza para comparações (letras minúsculas)
+            item = re.sub(r"[.,]", "", item)  # Remove pontos e vírgulas inconsistentes
+            item = re.sub(r"\s+", " ", item)  # Remove espaços extras
+
             identificado = False
-            log_item = {"faixa": item, "status": "Não identificado", "detalhes": ""}
+            log_item = {"faixa": item_original, "status": "Não identificado", "detalhes": ""}
 
             for padrao, descricao in regex.items():
                 if re.search(padrao, item):
@@ -119,8 +123,8 @@ def processar_dados():
                     break  # Garante que cada dado seja mapeado apenas uma vez
 
             if not identificado:
-                nao_identificados.append(item)
-                if not re.search(r"R\$?[0-9]", item):
+                nao_identificados.append(item_original)
+                if not re.search(r"r\$?\d+", item):
                     log_item["detalhes"] = "Faixa não contém valores monetários claros."
                 elif not re.search(r"até|maior|acima|entre|menor|abaixo", item):
                     log_item["detalhes"] = "Faixa não contém palavras-chave identificáveis."
@@ -129,7 +133,7 @@ def processar_dados():
 
             logs.append(log_item)
 
-        # Retorna o log detalhado e os resultados em strings
+        # Retorna o log detalhado e os resultados
         return jsonify({
             "sucesso": sucesso,
             "nao_identificados": nao_identificados,
