@@ -89,5 +89,56 @@ def atualizar_regex():
         return jsonify({"erro": f"Erro ao atualizar regex: {str(e)}"}), 500
 
 
+# Endpoint para processar os dados
+@app.route('/process', methods=['POST'])
+def processar_dados():
+    try:
+        # Recebe os dados enviados pelo cliente
+        dados = request.json.get("dados", "").split(",")
+        regex = request.json.get("regex", {})
+
+        if not dados or not regex:
+            return jsonify({"erro": "Dados ou regex não fornecidos"}), 400
+
+        # Aplica os regex nos dados
+        sucesso = []
+        nao_identificados = []
+        logs = []  # Lista para armazenar os logs detalhados
+
+        for item in dados:
+            item = item.strip()
+            identificado = False
+            log_item = {"faixa": item, "status": "Não identificado", "detalhes": ""}
+
+            for padrao, descricao in regex.items():
+                if re.search(padrao, item):
+                    sucesso.append(descricao)
+                    log_item["status"] = "Identificado"
+                    log_item["detalhes"] = f"Regex aplicado: {padrao}, Descrição: {descricao}"
+                    identificado = True
+                    break  # Garante que cada dado seja mapeado apenas uma vez
+
+            if not identificado:
+                nao_identificados.append(item)
+                if not re.search(r"R\$?[0-9]", item):
+                    log_item["detalhes"] = "Faixa não contém valores monetários claros."
+                elif not re.search(r"até|maior|acima|entre|menor|abaixo", item):
+                    log_item["detalhes"] = "Faixa não contém palavras-chave identificáveis."
+                else:
+                    log_item["detalhes"] = "Faixa não corresponde a nenhum regex fornecido."
+
+            logs.append(log_item)
+
+        # Retorna o log detalhado e os resultados em strings
+        return jsonify({
+            "sucesso": sucesso,
+            "nao_identificados": nao_identificados,
+            "logs": logs
+        }), 200
+
+    except Exception as e:
+        return jsonify({"erro": f"Erro ao processar os dados: {str(e)}"}), 500
+
+
 if __name__ == '__main__':
     app.run(debug=True)
