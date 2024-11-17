@@ -6,78 +6,57 @@ app = Flask(__name__)
 # Armazena os regex gerados dinamicamente
 regex_map = {}
 
-# Função para gerar regex dinamicamente com base nos dados
-def gerar_regex(dados):
-    global regex_map
-    novos_regex = {}
-
-    for item in dados:
-        # Se o item já é coberto por um regex existente, pule
-        if any(re.search(padrao, item) for padrao in regex_map):
-            continue
-
-        # Detecta faixas numéricas: Exemplo "De R$2.001 a R$2.400" ou "Entre R$2.801 e R$3.200"
-        if re.search(r"(de|entre)\s*r\$[0-9]+[.,]?[0-9]*\s*(a|e)\s*r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE):
-            match = re.findall(r"(de|entre)\s*r\$([0-9]+[.,]?[0-9]*)\s*(a|e)\s*r\$([0-9]+[.,]?[0-9]*)", item, re.IGNORECASE)
-            for m in match:
-                valor1, valor2 = m[1], m[3]
-                regex_key = rf"r\$?{re.escape(valor1)}.*(a|e).*r\$?{re.escape(valor2)}"
-                novos_regex[regex_key] = f"Entre R${valor1} e R${valor2}"
-
-        # Detecta números soltos com "Até R$X"
-        elif re.search(r"até\s*r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE):
-            match = re.findall(r"até\s*r\$([0-9]+[.,]?[0-9]*)", item, re.IGNORECASE)
-            for m in match:
-                valor = m
-                regex_key = rf"até\s*r\$?{re.escape(valor)}"
-                novos_regex[regex_key] = f"Abaixo de R${valor}"
-
-        # Detecta números soltos com "Maior que R$X"
-        elif re.search(r"maior\s*que\s*r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE):
-            match = re.findall(r"maior\s*que\s*r\$([0-9]+[.,]?[0-9]*)", item, re.IGNORECASE)
-            for m in match:
-                valor = m
-                regex_key = rf"maior\s*que\s*r\$?{re.escape(valor)}"
-                novos_regex[regex_key] = f"Maior que R${valor}"
-
-        # Detecta valores individuais como "R$X"
-        elif re.search(r"r\$[0-9]+[.,]?[0-9]*", item, re.IGNORECASE):
-            match = re.findall(r"r\$([0-9]+[.,]?[0-9]*)", item, re.IGNORECASE)
-            for m in match:
-                valor = m
-                regex_key = rf"r\$?{re.escape(valor)}"
-                novos_regex[regex_key] = f"Valor R${valor}"
-
-    regex_map.update(novos_regex)
-    return novos_regex
-
-# Função para dividir texto separado por vírgula em lista
+# Função para dividir texto separado por vírgula
 def split_text(text):
     return [item.strip() for item in text.split(",") if item.strip()]
 
-# Endpoint para gerar regex a partir dos dados fornecidos
+# Função para gerar regex dinamicamente com base nos dados
+def gerar_regex(dados):
+    global regex_map
+    regex_map = {}  # Limpa o mapa de regex antes de gerar novos
+
+    for item in dados:
+        if re.search(r"r\$[0-9]+[.,]?[0-9]*_a_r\$[0-9]+[.,]?[0-9]*", item):
+            match = re.findall(r"r\$[0-9]+[.,]?[0-9]*_a_r\$[0-9]+[.,]?[0-9]*", item)
+            for m in match:
+                valor1, valor2 = m.replace("r$", "").replace("_a_", " ").split(" ")
+                regex_map[rf"{re.escape(m)}"] = f"Entre R${valor1} e R${valor2}"
+
+        elif re.search(r"maior_que_r\$[0-9]+[.,]?[0-9]*", item):
+            match = re.findall(r"maior_que_r\$[0-9]+[.,]?[0-9]*", item)
+            for m in match:
+                valor = m.replace("maior_que_r$", "")
+                regex_map[rf"{re.escape(m)}"] = f"Maior que R${valor}"
+
+        elif re.search(r"até_r\$[0-9]+[.,]?[0-9]*", item):
+            match = re.findall(r"até_r\$[0-9]+[.,]?[0-9]*", item)
+            for m in match:
+                valor = m.replace("até_r$", "")
+                regex_map[rf"{re.escape(m)}"] = f"Abaixo de R${valor}"
+
+    return regex_map
+
+# Endpoint para atualizar os regex
 @app.route('/update-regex', methods=['POST'])
 def atualizar_regex():
     try:
-        # Recebe os dados enviados pelo cliente como texto separado por vírgulas
+        # Recebe os dados enviados pelo cliente
         dados_raw = request.json.get("dados", "")
         if not dados_raw:
             return jsonify({"erro": "Nenhum dado fornecido"}), 400
 
-        # Divide o texto em uma lista
+        # Divide os dados em itens separados por vírgula
         dados = split_text(dados_raw)
 
-        # Gera regex para os novos dados
-        novos_regex = gerar_regex(dados)
+        # Gera os regex dinamicamente
+        regex_gerados = gerar_regex(dados)
 
-        # Retorna os regex no formato JSON diretamente utilizável no /process
-        return jsonify(novos_regex), 200
+        return jsonify(regex_gerados), 200
 
     except Exception as e:
-        print(f"Erro no /update-regex: {str(e)}")
         return jsonify({"erro": f"Erro ao atualizar regex: {str(e)}"}), 500
 
-# Endpoint para processar os dados utilizando regex fornecido
+# Endpoint para processar os dados
 @app.route('/process', methods=['POST'])
 def processar_dados():
     try:
@@ -105,31 +84,19 @@ def processar_dados():
             else:
                 # Ordenar correspondências por comprimento (mais específica = mais detalhada)
                 matches.sort(key=len, reverse=True)
-                resultados_sucesso.append({
-                    "dado": item,
-                    "faixa": matches[0]  # Escolher a correspondência mais longa/específica
-                })
+                resultados_sucesso.append(matches[0])  # Armazena apenas a descrição mais específica
+
+        # Junta os sucessos e não identificados em strings únicas, separados por vírgula
+        sucesso_em_uma_celula = ", ".join(resultados_sucesso)
+        nao_identificados_em_uma_celula = ", ".join(resultados_nao_encontrados)
 
         return jsonify({
-            "sucesso": resultados_sucesso,
-            "nao_identificados": resultados_nao_encontrados
+            "sucesso": sucesso_em_uma_celula,
+            "nao_identificados": nao_identificados_em_uma_celula
         }), 200
 
     except Exception as e:
         return jsonify({"erro": f"Erro ao processar os dados: {str(e)}"}), 500
-
-# Endpoint para adicionar regex manualmente
-@app.route('/add-regex', methods=['POST'])
-def adicionar_regex_manual():
-    try:
-        regex_novos = request.json.get("regex", {})
-        if not regex_novos:
-            return jsonify({"erro": "Nenhum regex fornecido"}), 400
-
-        regex_map.update(regex_novos)
-        return jsonify({"mensagem": "Regex adicionados com sucesso"}), 200
-    except Exception as e:
-        return jsonify({"erro": f"Erro ao adicionar regex: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
