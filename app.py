@@ -14,35 +14,40 @@ def gerar_regex(dados):
     for item in dados:
         item = item.lower().strip()  # Normaliza o texto para evitar erros
 
-        # Prioriza faixas "Entre R$X e R$Y"
-        if re.search(r"r\$[0-9]+[.,]?[0-9]*_a_r\$[0-9]+[.,]?[0-9]*", item):
-            match = re.findall(r"r\$[0-9]+[.,]?[0-9]*_a_r\$[0-9]+[.,]?[0-9]*", item)
+        # Faixas como "Entre R$X e R$Y" ou "De R$X a R$Y"
+        if re.search(r"(entre|de)\s*r\$[0-9]+[.,]?[0-9]*\s*(e|a)\s*r\$[0-9]+[.,]?[0-9]*", item):
+            match = re.findall(r"(entre|de)\s*r\$([0-9]+[.,]?[0-9]*)\s*(e|a)\s*r\$([0-9]+[.,]?[0-9]*)", item)
             for m in match:
-                if m not in regex_map:  # Evita duplicatas
-                    valor1, valor2 = m.replace("r$", "").replace("_a_", " ").split(" ")
-                    regex_map[rf"{re.escape(m)}"] = f"Entre R${valor1} e R${valor2}"
+                valor1, valor2 = m[1], m[3]
+                regex_key = rf"r\$?{re.escape(valor1)}.*(e|a).*r\$?{re.escape(valor2)}"
+                regex_map[regex_key] = f"Entre R${valor1} e R${valor2}"
 
-        # Trata valores do tipo "maior_que_R$X" -> "Acima de R$X"
-        elif re.search(r"maior_que_r\$[0-9]+[.,]?[0-9]*", item):
-            match = re.findall(r"maior_que_r\$[0-9]+[.,]?[0-9]*", item)
+        # "Até R$X" -> "Abaixo de R$X"
+        elif re.search(r"até\s*r\$[0-9]+[.,]?[0-9]*", item):
+            match = re.findall(r"até\s*r\$([0-9]+[.,]?[0-9]*)", item)
             for m in match:
-                if m not in regex_map:
-                    valor = m.replace("maior_que_r$", "")
-                    regex_map[rf"{re.escape(m)}"] = f"Acima de R${valor}"
+                regex_key = rf"até\s*r\$?{re.escape(m)}"
+                regex_map[regex_key] = f"Abaixo de R${m}"
 
-        # Trata valores do tipo "até_R$X" -> "Abaixo de R$X"
-        elif re.search(r"até_r\$[0-9]+[.,]?[0-9]*", item):
-            match = re.findall(r"até_r\$[0-9]+[.,]?[0-9]*", item)
+        # "Maior que R$X" -> "Acima de R$X"
+        elif re.search(r"(maior|acima)\s*que\s*r\$[0-9]+[.,]?[0-9]*", item):
+            match = re.findall(r"(maior|acima)\s*que\s*r\$([0-9]+[.,]?[0-9]*)", item)
             for m in match:
-                if m not in regex_map:
-                    valor = m.replace("até_r$", "")
-                    regex_map[rf"{re.escape(m)}"] = f"Abaixo de R${valor}"
+                regex_key = rf"(maior|acima)\s*que\s*r\$?{re.escape(m[1])}"
+                regex_map[regex_key] = f"Acima de R${m[1]}"
 
-        # Trata números soltos como "R$X" -> Adiciona contexto "Abaixo de R$X" (padrão)
+        # "Menor que R$X" -> "Abaixo de R$X"
+        elif re.search(r"(menor|abaixo)\s*que\s*r\$[0-9]+[.,]?[0-9]*", item):
+            match = re.findall(r"(menor|abaixo)\s*que\s*r\$([0-9]+[.,]?[0-9]*)", item)
+            for m in match:
+                regex_key = rf"(menor|abaixo)\s*que\s*r\$?{re.escape(m[1])}"
+                regex_map[regex_key] = f"Abaixo de R${m[1]}"
+
+        # Números soltos como "R$X"
         elif re.match(r"^r\$[0-9]+[.,]?[0-9]*$", item):
-            if item not in regex_map:
-                valor = item.replace("r$", "")
-                regex_map[rf"{re.escape(item)}"] = f"Abaixo de R${valor}"
+            valor = item.replace("r$", "")
+            regex_key = rf"r\$?{re.escape(valor)}"
+            regex_map[regex_key] = f"Abaixo de R${valor}"
 
     return regex_map
 
