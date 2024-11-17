@@ -77,22 +77,28 @@ def processar_dados():
             return jsonify({"erro": "Dados ou regex não fornecidos"}), 400
 
         # Aplica os regex nos dados
-        resultados = {"sucesso": [], "nao_identificados": []}
+        sucesso = []
+        nao_identificados = []
 
         for item in dados:
             item = item.strip()
             identificado = False
             for padrao, descricao in regex.items():
                 if re.search(padrao, item):
-                    resultados["sucesso"].append({"dado": item, "faixa": descricao})
+                    sucesso.append(descricao)
                     identificado = True
                     break  # Garante que cada dado seja mapeado apenas uma vez
             if not identificado:
-                resultados["nao_identificados"].append(item)
+                nao_identificados.append(item)
 
-        # Consolida os resultados em formato único
-        resultados["sucesso"] = [res["faixa"] for res in resultados["sucesso"]]
-        return jsonify(resultados), 200
+        # Concatena os resultados em strings únicas
+        sucesso_str = ", ".join(sucesso)
+        nao_identificados_str = ", ".join(nao_identificados)
+
+        return jsonify({
+            "sucesso": sucesso_str,
+            "nao_identificados": nao_identificados_str
+        }), 200
 
     except Exception as e:
         return jsonify({"erro": f"Erro ao processar os dados: {str(e)}"}), 500
