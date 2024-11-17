@@ -12,9 +12,7 @@ def gerar_regex(dados_lista):
         log_item = {"faixa": item, "status": "", "detalhes": ""}
         try:
             item = item.lower().strip()  # Normaliza o texto para evitar erros
-
-            # Trata underscores e troca por espaços
-            item = item.replace("_", " ")
+            item = item.replace("_", " ")  # Substitui underscores por espaços
 
             # Faixas como "Entre R$X e R$Y" ou "R$X_a_R$Y"
             if re.search(r"r\$[0-9]+[.,]?[0-9]*\s*(a|e)\s*r\$[0-9]+[.,]?[0-9]*", item):
@@ -74,9 +72,9 @@ def gerar_regex(dados_lista):
     return regex_gerados, logs
 
 
-# Função para transcrever diretamente
+# Função de transcrição direta
 def transcrever_dados(dados_lista):
-    transcricoes = {}
+    transcritos = {}
     logs = []
 
     for item in dados_lista:
@@ -84,27 +82,18 @@ def transcrever_dados(dados_lista):
         try:
             item = item.lower().strip()
 
-            # Ajusta underscores e converte diretamente
-            item = item.replace("_", " ")
-
-            if item.startswith("até"):
-                transcricoes[item] = item.replace("até", "Abaixo de").capitalize()
-                log_item["status"] = "Transcrito"
-                log_item["detalhes"] = "Transcrição direta realizada."
-
-            elif "maior que" in item:
-                transcricoes[item] = item.replace("maior que", "Acima de").capitalize()
-                log_item["status"] = "Transcrito"
-                log_item["detalhes"] = "Transcrição direta realizada."
-
-            elif "r$" in item:
-                transcricoes[item] = f"Abaixo de R${item.replace('r$', '').strip()}"
+            # Transcrição direta para valores específicos
+            if re.match(r"^r\$[0-9]+[.,]?[0-9]*$", item):
+                valor = item.replace("r$", "")
+                transcritos[item] = f"Abaixo de R${valor}"
                 log_item["status"] = "Transcrito"
                 log_item["detalhes"] = "Valor específico transcrito."
 
+            # Transcrição direta para outros casos
             else:
-                log_item["status"] = "Não identificado"
-                log_item["detalhes"] = "Nenhum padrão aplicável para transcrição."
+                transcritos[item] = f"Transcrição direta de '{item}'"
+                log_item["status"] = "Transcrito"
+                log_item["detalhes"] = "Transcrição direta realizada."
 
         except Exception as e:
             log_item["status"] = "Erro"
@@ -112,7 +101,7 @@ def transcrever_dados(dados_lista):
 
         logs.append(log_item)
 
-    return transcricoes, logs
+    return transcritos, logs
 
 
 @app.route('/update-regex', methods=['POST'])
@@ -130,41 +119,33 @@ def process():
     try:
         dados = request.json.get("dados", "").split(",")
         regex = request.json.get("regex", {})
+
         sucesso = []
         nao_identificados = []
-        logs = []
 
         for item in dados:
-            item = item.strip()
             identificado = False
-
             for padrao, descricao in regex.items():
                 if re.search(padrao, item):
                     sucesso.append(descricao)
                     identificado = True
                     break
-
             if not identificado:
                 nao_identificados.append(item)
 
-        # Transcrever os não identificados como fallback
-        transcricoes, transcricao_logs = transcrever_dados(nao_identificados)
-        sucesso.extend(transcricoes.values())
-        logs.extend(transcricao_logs)
-
-        return jsonify({"sucesso": sucesso, "nao_identificados": nao_identificados, "logs": logs}), 200
+        return jsonify({"sucesso": sucesso, "nao_identificados": nao_identificados}), 200
     except Exception as e:
-        return jsonify({"erro": f"Erro ao processar: {str(e)}"}), 500
+        return jsonify({"erro": f"Erro ao processar os dados: {str(e)}"}), 500
 
 
 @app.route('/transcrever', methods=['POST'])
 def transcrever():
     try:
         dados = request.json.get("dados", "").split(",")
-        transcricoes, logs = transcrever_dados(dados)
-        return jsonify({"transcricoes": transcricoes, "logs": logs}), 200
+        transcritos, logs = transcrever_dados(dados)
+        return jsonify({"transcritos": transcritos, "logs": logs}), 200
     except Exception as e:
-        return jsonify({"erro": f"Erro ao transcrever: {str(e)}"}), 500
+        return jsonify({"erro": f"Erro ao transcrever os dados: {str(e)}"}), 500
 
 
 if __name__ == '__main__':
